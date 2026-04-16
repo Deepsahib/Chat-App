@@ -3,55 +3,45 @@ import { sendPhoneOTP } from "../services/twilioservice.js";
 import { generateOtp } from "../utilis/otpGenerator.js";
 import User from "../models/userschema.js";
 import { errorResponse, successResponse } from "../utilis/serverResponse.js";
-
+import { generateJwtToken } from "../utilis/jwtgenerate.js";
 export const sendOtpController = async (req, res) => {
+ 
     try {
-        const { email, phoneSuffix, phoneNumber } = req.body;
-        if (!email && !(phoneSuffix && phoneNumber)) {
-            return errorResponse(
-                res,
-                "Email or Phone (suffix + number) is required",
-                400
-            );
+        const { email } = req.body;
+        // ❌ Email required
+        if (!email) {
+            return errorResponse(res, "Email is required", 400);
         }
+
         const otp = generateOtp();
-
-        if (email) {
-            const user = await User.findOne({ email });
-            if (!user) {
-                return errorResponse(res, "User with this email not found", 404);
-            }
-
-            user.emailOtp = otp;
-            user.emailOtpExpiry = (Date.now() + 5 * 60 * 1000).toString();
-            await user.save();
-
-            const emailResult = await sendEmailOtpController(email, otp);
-            if (!emailResult.success) {
-                return errorResponse(res, emailResult.message, 500);
-            }
-
-            return successResponse(res, "OTP sent to email", 200, {
-                email,
-            });
+        let user = await User.findOne({ email });
+        if (user && user.isVerified) {
+            return errorResponse(res, "User already verified", 400);
         }
 
-        // PHONE case
-        if (phoneSuffix && phoneNumber) {
-            const fullPhone = `${phoneSuffix}${phoneNumber}`;
-
-            const phoneResult = await sendPhoneOTP(fullPhone);
-            if (!phoneResult.success) {
-                return errorResponse(res, phoneResult.message, 500);
-            }
-
-            return successResponse(res, "OTP sent to phone", 200, {
-                phone: fullPhone,
-            });
+        // ✅ Create user if not exists
+        if (!user) {
+            user = new User({ email });
         }
+
+        // ✅ Save OTP
+        user.emailOtp = otp;
+        user.emailOtpExpiry = Date.now() + 5 * 60 * 1000;
+
+        await user.save()
+        const emailResult = await sendEmailOtpController(email, otp);
+
+        if (!emailResult.success) {
+            return errorResponse(res, emailResult.message, 500);
+        }
+
+        return successResponse(res, "OTP sent to email", 200, {
+            email,
+        });
 
     } catch (error) {
-        return errorResponse(res, error.message, 500);
+        console.error(error);
+        return errorResponse(res, "Internal server error", 500);
     }
 };
 
@@ -78,16 +68,16 @@ export const verifyEmailOtpController = async (req, res) => {
 
         if (user.emailOtp !== otp.toString()) {
             return errorResponse(res, "Invalid email OTP", 400);
-        }
-
-        user.isVerified = true;
+        } 
         user.emailOtp = undefined;
         user.emailOtpExpiry = undefined;
+        user.isVerified = true;
         await user.save();
-        const token=generateJwtToken(user._id);
 
+        const token = generateJwtToken(user._id);
 
-        return res.cookie("token", token, { httpOnly: true }).successResponse(res, "Email OTP verified successfully", 200, {
+        res.cookie("token", token, { httpOnly: true });
+        return successResponse(res, "Email OTP verified successfully", 200, {
             email: user.email,
             isVerified: user.isVerified,
         });

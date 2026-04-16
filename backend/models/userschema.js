@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 const userschema = new mongoose.Schema({
-  phoneNumber: {type: String,unique: true, required: true},
-  phoneSuffix: {type: String, required: true},
-  userName: {type: String, required: true},
-  email: {type: String, required: true},
+  phoneNumber: {type: String},
+  phoneSuffix: {type: String},
+  userName: {type: String},
+  email: {type: String},
   emailOtp:{type:String},
   emailOtpExpiry:{type:String},
   profilePicture:{type:String},
