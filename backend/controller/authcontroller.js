@@ -1,5 +1,4 @@
 import { sendEmailOtpController } from "../services/emailservice.js";
-import { sendPhoneOTP } from "../services/twilioservice.js";
 import { generateOtp } from "../utilis/otpGenerator.js";
 import User from "../models/userschema.js";
 import { errorResponse, successResponse } from "../utilis/serverResponse.js";
@@ -85,3 +84,48 @@ export const verifyEmailOtpController = async (req, res) => {
         return errorResponse(res, error.message, 500);
     }
 };
+
+export const updateProfile=async(req,res)=>{
+    const {userName,agreed,about} = req.body;
+    const userId=req.user;
+    try {
+        const user=await User.findById(userId);
+        const file=req.file;
+        if(file){
+            const uploadResult=await uploadImage(file.path);
+            user.profilePicture=uploadResult.secure_url;
+        }
+        if(userName) user.userName=userName;
+        if(about) user.about=about;
+        if(agreed!==undefined) user.agreed=agreed;
+        await user.save();
+        return successResponse(res,"Profile updated successfully",200,user);
+    } catch (error) {
+        return errorResponse(res,error.message,500);
+    }
+}
+
+export const logout=async(req,res)=>{
+try {
+    res.cookie("token","",{
+        httpOnly:true,
+        expires:new Date(0)
+    });
+    return successResponse(res,"Logged out successfully",200);
+} catch (error) {
+    return errorResponse(res,error.message,500);
+}
+}
+
+export const checkauthenctication=async(req,res)=>{
+    try {
+        const userId=req.user;  
+        const user=await User.findById(userId);
+        if(!user){
+            return errorResponse(res,"User not found",404);
+        }
+        return successResponse(res,"User authenticated",200,user);
+    } catch (error) {
+        return errorResponse(res,error.message,500);
+    }
+}
